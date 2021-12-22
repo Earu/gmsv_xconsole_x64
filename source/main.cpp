@@ -18,10 +18,8 @@ class XConsoleListener : public ILoggingListener
 public:
 	XConsoleListener(bool bQuietPrintf = false, bool bQuietDebugger = false) {}
 
-	virtual void Log(const LoggingContext_t* pContext, const tchar* pMessage)
+	void Log(const LoggingContext_t* pContext, const char* pMessage) override
 	{
-		if (pContext->m_Flags == LoggingChannelFlags_t::LCF_DO_NOT_ECHO) return;
-
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
 		MultiLibrary::ByteBuffer buffer;
@@ -32,8 +30,6 @@ public:
 			chan->m_Name <<
 			color->GetRawColor() <<
 			pMessage;
-
-		
 
 		if (WriteFile(server_pipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			server_connected = false;
@@ -91,6 +87,7 @@ GMOD_MODULE_OPEN()
 
 	server_thread = std::thread(ServerThread);
 
+	//LoggingSystem_PushLoggingState(false, true);
 	LoggingSystem_RegisterLoggingListener(listener);
 
 	return 0;
@@ -98,7 +95,8 @@ GMOD_MODULE_OPEN()
 
 GMOD_MODULE_CLOSE()
 {
-	LoggingSystem_UnregisterLoggingListener(listener);
+	//LoggingSystem_UnregisterLoggingListener(listener);
+	LoggingSystem_PopLoggingState(false);
 	delete listener;
 
 	server_shutdown = true;
