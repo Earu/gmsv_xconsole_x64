@@ -8,10 +8,10 @@
 #include <thread>
 #include <logging.h>
 
-static HANDLE server_pipe = INVALID_HANDLE_VALUE;
-static volatile bool server_shutdown = false;
-static volatile bool server_connected = false;
-static std::thread server_thread;
+static HANDLE serverPipe = INVALID_HANDLE_VALUE;
+static volatile bool serverShutdown = false;
+static volatile bool serverConnected = false;
+static std::thread serverThread;
 
 class XConsoleListener : public ILoggingListener
 {
@@ -23,7 +23,7 @@ public:
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
 		MultiLibrary::ByteBuffer buffer;
-		buffer.Reserve(512);
+		buffer.Reserve(8192);
 		buffer <<
 			static_cast<int32_t>(chan->m_ID) <<
 			pContext->m_Severity <<
@@ -31,29 +31,29 @@ public:
 			color->GetRawColor() <<
 			pMessage;
 
-		if (WriteFile(server_pipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
-			server_connected = false;
+		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
+			serverConnected = false;
 	}
 };
 
 
 static void ServerThread()
 {
-	while(!server_shutdown)
+	while (!serverShutdown)
 	{
-		if( ConnectNamedPipe(server_pipe, nullptr) == FALSE)
+		if (ConnectNamedPipe(serverPipe, nullptr) == FALSE)
 		{
 			DWORD error = GetLastError();
 			if (error == ERROR_NO_DATA)
 			{
-				DisconnectNamedPipe(server_pipe);
-				server_connected = false;
+				DisconnectNamedPipe(serverPipe);
+				serverConnected = false;
 			}
 			else if (error == ERROR_PIPE_CONNECTED)
-				server_connected = true;
+				serverConnected = true;
 		}
 		else
-			server_connected = true;
+			serverConnected = true;
 
 		Sleep(1);
 	}
@@ -71,7 +71,7 @@ GMOD_MODULE_OPEN()
 	sa.lpSecurityDescriptor = &sd;
 	sa.bInheritHandle = FALSE;
 
-	server_pipe = CreateNamedPipe(
+	serverPipe = CreateNamedPipe(
 		"\\\\.\\pipe\\garrysmod_console",
 		PIPE_ACCESS_OUTBOUND,
 		PIPE_TYPE_MESSAGE | PIPE_NOWAIT,
@@ -82,12 +82,10 @@ GMOD_MODULE_OPEN()
 		&sa
 	);
 
-	if(server_pipe == INVALID_HANDLE_VALUE)
+	if (serverPipe == INVALID_HANDLE_VALUE)
 		LUA->ThrowError( "failed to create named pipe" );
 
-	server_thread = std::thread(ServerThread);
-
-	//LoggingSystem_PushLoggingState(false, true);
+	serverThread = std::thread(ServerThread);
 	LoggingSystem_RegisterLoggingListener(listener);
 
 	return 0;
@@ -95,16 +93,15 @@ GMOD_MODULE_OPEN()
 
 GMOD_MODULE_CLOSE()
 {
-	//LoggingSystem_UnregisterLoggingListener(listener);
-	LoggingSystem_PopLoggingState(false);
+	LoggingSystem_UnregisterLoggingListener(listener);
 	delete listener;
 
-	server_shutdown = true;
-	server_thread.join();
+	serverShutdown = true;
+	serverThread.join();
 
-	FlushFileBuffers(server_pipe);
-	DisconnectNamedPipe(server_pipe);
-	CloseHandle(server_pipe);
+	FlushFileBuffers(serverPipe);
+	DisconnectNamedPipe(serverPipe);
+	CloseHandle(serverPipe);
 
 	return 0;
 }
