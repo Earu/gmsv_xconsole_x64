@@ -7,6 +7,8 @@
 #include <string>
 #include <thread>
 #include <logging.h>
+#include <GarrysMod/FactoryLoader.hpp>
+#include <eiface.h>
 
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 static volatile bool serverShutdown = false;
@@ -36,6 +38,28 @@ public:
 	}
 };
 
+static void ReadIncomingCommands() 
+{
+	MultiLibrary::ByteBuffer buffer;
+	buffer.Reserve(255);
+	buffer.Resize(255);
+	if (ReadFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == TRUE)
+	{
+		if (buffer.Size() == 0) return;
+
+		std::string cmd;
+		buffer >> cmd;
+
+		// in case the command hasnt been passed with a newline
+		if (cmd[cmd.length() - 1] != '\n')
+			cmd.append("\n");
+
+		SourceSDK::FactoryLoader engine_loader("engine");
+		IVEngineServer* engine_server = engine_loader.GetInterface<IVEngineServer>(INTERFACEVERSION_VENGINESERVER);
+		engine_server->ServerCommand(cmd.c_str());
+	}
+}
+
 
 static void ServerThread()
 {
@@ -49,11 +73,16 @@ static void ServerThread()
 				DisconnectNamedPipe(serverPipe);
 				serverConnected = false;
 			}
-			else if (error == ERROR_PIPE_CONNECTED)
+			else if (error == ERROR_PIPE_CONNECTED) {
 				serverConnected = true;
+				ReadIncomingCommands();
+			}
 		}
 		else
+		{
 			serverConnected = true;
+			ReadIncomingCommands();
+		}
 
 		Sleep(1);
 	}
@@ -73,7 +102,7 @@ GMOD_MODULE_OPEN()
 
 	serverPipe = CreateNamedPipe(
 		"\\\\.\\pipe\\garrysmod_console",
-		PIPE_ACCESS_OUTBOUND,
+		PIPE_ACCESS_DUPLEX,
 		PIPE_TYPE_MESSAGE | PIPE_NOWAIT,
 		PIPE_UNLIMITED_INSTANCES,
 		8192,
