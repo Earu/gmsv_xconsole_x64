@@ -115,6 +115,8 @@ GMOD_MODULE_OPEN()
 		LUA->ThrowError( "failed to create named pipe" );
 
 	serverThread = std::thread(ServerThread);
+
+	LoggingSystem_PushLoggingState(false, false);
 	LoggingSystem_RegisterLoggingListener(listener);
 
 	return 0;
@@ -123,6 +125,7 @@ GMOD_MODULE_OPEN()
 GMOD_MODULE_CLOSE()
 {
 	LoggingSystem_UnregisterLoggingListener(listener);
+	LoggingSystem_PopLoggingState(false);
 	delete listener;
 
 	serverShutdown = true;
