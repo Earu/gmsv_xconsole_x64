@@ -2,7 +2,11 @@
 #include <ByteBuffer.hpp>
 #include <dbg.h>
 #include <Color.h>
+
+#ifdef _WIN32
 #include <Windows.h>
+#endif
+
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -10,6 +14,7 @@
 #include <GarrysMod/FactoryLoader.hpp>
 #include <eiface.h>
 
+#ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 static volatile bool serverShutdown = false;
 static volatile bool serverConnected = false;
@@ -137,3 +142,14 @@ GMOD_MODULE_CLOSE()
 
 	return 0;
 }
+#else
+GMOD_MODULE_OPEN() 
+{
+	return 0;
+}
+
+GMOD_MODULE_CLOSE()
+{
+	return 0;
+}
+#endif
