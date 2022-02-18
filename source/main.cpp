@@ -1,25 +1,23 @@
+#ifdef _WIN32
 #include <GarrysMod/Lua/Interface.h>
+#include <GarrysMod/FactoryLoader.hpp>
 #include <ByteBuffer.hpp>
+#include <Platform.hpp>
 #include <dbg.h>
 #include <Color.h>
-
-#ifdef _WIN32
 #include <Windows.h>
-#endif
-
 #include <cstdint>
 #include <string>
 #include <thread>
 #include <logging.h>
-#include <GarrysMod/FactoryLoader.hpp>
 #include <eiface.h>
 
-#ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 static volatile bool serverShutdown = false;
 static volatile bool serverConnected = false;
 static std::thread serverThread;
 
+#if ARCHITECTURE_IS_X86_64
 class XConsoleListener : public ILoggingListener
 {
 public:
@@ -42,6 +40,37 @@ public:
 			serverConnected = false;
 	}
 };
+
+ILoggingListener* listener = new XConsoleListener();
+#else
+static SpewOutputFunc_t spewFunction = nullptr;
+static SpewRetval_t EngineSpewReceiver(SpewType_t type, const char* msg)
+{
+	if (!serverConnected)
+		return spewFunction(type, msg);
+
+	const Color* color = GetSpewOutputColor();
+	MultiLibrary::ByteBuffer buffer;
+	buffer.Reserve(512);
+	buffer <<
+		static_cast<int32_t>(type) <<
+		GetSpewOutputLevel() <<
+		GetSpewOutputGroup() <<
+		color->GetRawColor() <<
+		msg;
+
+	if (WriteFile(
+		serverPipe,
+		buffer.GetBuffer(),
+		static_cast<DWORD>(buffer.Size()),
+		nullptr,
+		nullptr
+	) == FALSE)
+		serverConnected = false;
+
+	return spewFunction(type, msg);
+}
+#endif
 
 static void ReadIncomingCommands() 
 {
@@ -93,7 +122,6 @@ static void ServerThread()
 	}
 }
 
-ILoggingListener* listener = new XConsoleListener();
 GMOD_MODULE_OPEN()
 {
 	SECURITY_DESCRIPTOR sd;
@@ -121,17 +149,26 @@ GMOD_MODULE_OPEN()
 
 	serverThread = std::thread(ServerThread);
 
+#if ARCHITECTURE_IS_X86_64
 	LoggingSystem_PushLoggingState(false, false);
 	LoggingSystem_RegisterLoggingListener(listener);
+#else
+	spewFunction = GetSpewOutputFunc();
+	SpewOutputFunc(EngineSpewReceiver);
+#endif
 
 	return 0;
 }
 
 GMOD_MODULE_CLOSE()
 {
+#if ARCHITECTURE_IS_X86_64
 	LoggingSystem_UnregisterLoggingListener(listener);
 	LoggingSystem_PopLoggingState(false);
 	delete listener;
+#else
+	SpewOutputFunc(spewFunction);
+#endif
 
 	serverShutdown = true;
 	serverThread.join();
@@ -143,13 +180,7 @@ GMOD_MODULE_CLOSE()
 	return 0;
 }
 #else
-GMOD_MODULE_OPEN() 
-{
-	return 0;
-}
-
-GMOD_MODULE_CLOSE()
-{
-	return 0;
-}
+#include <GarrysMod/Lua/Interface.h>
+GMOD_MODULE_OPEN() { return 0; }
+GMOD_MODULE_CLOSE() { return 0; }
 #endif
