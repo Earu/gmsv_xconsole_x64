@@ -1,24 +1,41 @@
 # gmsv\_xconsole
-
 A Garry's Mod module that provides an interface for external consoles.
+**The aim of this fork is to provide a x64 compatible version of xconsole**
 
 ## Compiling
+### For the x86_64 branch:
+#### Building the project for linux/macos
+1) Get [premake](https://premake.github.io/download/) add it to your `PATH`
+2) Get [garrysmod_common](https://github.com/danielga/garrysmod_common) (with `git clone https://github.com/danielga/garrysmod_common --recursive --branch=x86-64-support-sourcesdk`) and set an env var called `GARRYSMOD_COMMON` to the path of the local repo
+3) Run `premake5 gmake` in your local copy of **this** repo
+4) Navigate to the makefile directory (`cd /projects/linux/gmake` or `cd /projects/macosx/gmake`)
+5) Run `make config=releasewithsymbols_x86_64`
 
-The only supported compilation platform for this project on Windows is **Visual Studio 2017**. However, it's possible it'll work with *Visual Studio 2015* and *Visual Studio 2019* because of the unified runtime.
+#### Building the project on windows
+1) Get [premake](https://premake.github.io/download/) add it to your `PATH`
+2) Get [garrysmod_common](https://github.com/danielga/garrysmod_common) (with `git clone https://github.com/danielga/garrysmod_common --recursive --branch=x86-64-support-sourcesdk`) and set an env var called `GARRYSMOD_COMMON` to the path of the local repo
+3) Run `premake5 vs2019` in your local copy of **this** repo
+4) Navigate to the project directory `cd /projects/windows/vs2019`
+5) Open the .sln in Visual Studio 2019+
+6) Select Release, and either x64 or x86
+7) Build
 
-On Linux, everything should work fine as is.
 
-For macOS, any **Xcode (using the GCC compiler)** version *MIGHT* work as long as the **Mac OSX 10.7 SDK** is used.
+### For the *current (x86)* main branch:
+#### Building the project for linux/macos
+1) Get [premake](https://premake.github.io/download/) add it to your `PATH`
+2) Get [garrysmod_common](https://github.com/danielga/garrysmod_common) (with `git clone https://github.com/danielga/garrysmod_common --recursive`) and set an env var called `GARRYSMOD_COMMON` to the path of the local repo
+3) Edit premake5.lua and change `PROJECT_GENERATOR_VERSION` to `2`
+4) Run `premake5 gmake` in your local copy of **this** repo
+5) Navigate to the makefile directory (`cd /projects/linux/gmake` or `cd /projects/macosx/gmake`)
+6) Run `make`
 
-These restrictions are not random; they exist because of ABI compatibility reasons.
-
-If stuff starts erroring or fails to work, be sure to check the correct line endings (`\n` and such) are present in the files for each OS.
-
-## Requirements
-
-This project requires [garrysmod\_common][1], a framework to facilitate the creation of compilations files (Visual Studio, make, XCode, etc). Simply set the environment variable `GARRYSMOD_COMMON` or the premake option `--gmcommon=path` to the path of your local copy of [garrysmod\_common][1].
-
-We also use [SourceSDK2013][2]. The links to [SourceSDK2013][2] point to my own fork of VALVe's repo and for good reason: Garry's Mod has lots of backwards incompatible changes to interfaces and it's much smaller, being perfect for automated build systems like Azure Pipelines.
-
-  [1]: https://github.com/danielga/garrysmod_common
-  [2]: https://github.com/danielga/sourcesdk-minimal
+#### Building the project on windows
+1) Get [premake](https://premake.github.io/download/) add it to your `PATH`
+2) Get [garrysmod_common](https://github.com/danielga/garrysmod_common) (with `git clone https://github.com/danielga/garrysmod_common --recursive`) and set an env var called `GARRYSMOD_COMMON` to the path of the local repo
+3) Run `premake5 vs2019` in your local copy of **this** repo
+4) Edit premake5.lua and change `PROJECT_GENERATOR_VERSION` to `2`
+5) Navigate to the project directory `cd /projects/windows/vs2019`
+6) Open the .sln in Visual Studio 2019+
+7) Select Release, and either x64 or x86
+8) Build
