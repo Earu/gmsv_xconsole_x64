@@ -1,16 +1,20 @@
 #ifdef _WIN32
-#include <GarrysMod/Lua/Interface.h>
-#include <GarrysMod/FactoryLoader.hpp>
-#include <ByteBuffer.hpp>
-#include <Platform.hpp>
-#include <dbg.h>
-#include <Color.h>
 #include <Windows.h>
 #include <cstdint>
 #include <string>
 #include <thread>
-#include <logging.h>
+
+#include <GarrysMod/Lua/Interface.h>
+#include <GarrysMod/FactoryLoader.hpp>
+#include <ByteBuffer.hpp>
+#include <Platform.hpp>
+#include <color.h>
 #include <eiface.h>
+#include <tier0/dbg.h>
+
+#if ARCHITECTURE_IS_X86_64
+#include <logging.h>
+#endif
 
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 static volatile bool serverShutdown = false;
@@ -18,6 +22,7 @@ static volatile bool serverConnected = false;
 static std::thread serverThread;
 
 #if ARCHITECTURE_IS_X86_64
+
 class XConsoleListener : public ILoggingListener
 {
 public:
