@@ -58,6 +58,13 @@ public:
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
 #else
+		buffer << "<EOL>";
+
+		if (serverPipe == -1) {
+			serverConnected = false;
+			return;
+		}
+
     	if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
         	serverConnected = false;
 #endif
@@ -148,15 +155,15 @@ static void ServerThread()
 		}
 #else
 		if (!serverConnected) {
-			/*if (mkfifo(pipeName, 0666) != -1) {
+			if (mkfifo(pipeName, 0666) != -1) {
 				serverPipe = open(pipeName, O_RDWR);
 				if (serverPipe != -1) {
 					serverConnected = true;
-					ReadIncomingCommands();
+					//ReadIncomingCommands();
 				}
-			}*/
+			}
 		} else {
-			ReadIncomingCommands();
+			//ReadIncomingCommands();
 		}
 #endif
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -189,6 +196,11 @@ GMOD_MODULE_OPEN()
 	if (serverPipe == INVALID_HANDLE_VALUE)
 		LUA->ThrowError( "failed to create named pipe" );
 #else
+	struct stat sb;
+	if (stat(pipeName, &sb) == 0 && !(sb.st_mode & S_IFDIR)) {
+		unlink(pipeName);
+	} 
+
    	if (mkfifo(pipeName, 0666) == -1) {
         LUA->ThrowError( "failed to create named pipe (mkfifo)" );
     } else {
