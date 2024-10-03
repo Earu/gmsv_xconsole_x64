@@ -1,8 +1,15 @@
 #ifdef _WIN32
 #include <Windows.h>
+#else
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/stat.h> 
+#endif
+
 #include <cstdint>
 #include <string>
 #include <thread>
+#include <chrono>
 
 #include <GarrysMod/Lua/Interface.h>
 #include <GarrysMod/FactoryLoader.hpp>
@@ -16,7 +23,13 @@
 #include <logging.h>
 #endif
 
+#ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
+#else 
+const char* pipeName = "/tmp/garrysmod_console";
+static int serverPipe = -1;
+#endif
+
 static volatile bool serverShutdown = false;
 static volatile bool serverConnected = false;
 static std::thread serverThread;
@@ -41,8 +54,13 @@ public:
 			color->GetRawColor() <<
 			pMessage;
 
+#ifdef _WIN32
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
+#else
+    	if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
+        	serverConnected = false;
+#endif
 	}
 };
 
@@ -82,7 +100,12 @@ static void ReadIncomingCommands()
 	MultiLibrary::ByteBuffer buffer;
 	buffer.Reserve(255);
 	buffer.Resize(255);
+
+#ifdef _WIN32
 	if (ReadFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == TRUE)
+#else
+	if (read(serverPipe, buffer.GetBuffer(), buffer.Size() - 1) != -1)
+#endif
 	{
 		if (buffer.Size() == 0) return;
 
@@ -104,6 +127,7 @@ static void ServerThread()
 {
 	while (!serverShutdown)
 	{
+#ifdef _WIN32
 		if (ConnectNamedPipe(serverPipe, nullptr) == FALSE)
 		{
 			DWORD error = GetLastError();
@@ -122,13 +146,26 @@ static void ServerThread()
 			serverConnected = true;
 			ReadIncomingCommands();
 		}
-
-		Sleep(1);
+#else
+		if (!serverConnected) {
+			/*if (mkfifo(pipeName, 0666) != -1) {
+				serverPipe = open(pipeName, O_RDWR);
+				if (serverPipe != -1) {
+					serverConnected = true;
+					ReadIncomingCommands();
+				}
+			}*/
+		} else {
+			ReadIncomingCommands();
+		}
+#endif
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
 
 GMOD_MODULE_OPEN()
 {
+#ifdef _WIN32
 	SECURITY_DESCRIPTOR sd;
 	InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
 	SetSecurityDescriptorDacl(&sd, TRUE, nullptr, FALSE);
@@ -151,6 +188,16 @@ GMOD_MODULE_OPEN()
 
 	if (serverPipe == INVALID_HANDLE_VALUE)
 		LUA->ThrowError( "failed to create named pipe" );
+#else
+   	if (mkfifo(pipeName, 0666) == -1) {
+        LUA->ThrowError( "failed to create named pipe (mkfifo)" );
+    } else {
+		serverPipe = open(pipeName, O_RDWR);
+		if (serverPipe == -1) {
+			LUA->ThrowError( "failed to create named pipe (open)" );
+		}
+	}
+#endif
 
 	serverThread = std::thread(ServerThread);
 
@@ -178,14 +225,14 @@ GMOD_MODULE_CLOSE()
 	serverShutdown = true;
 	serverThread.join();
 
+#ifdef _WIN32
 	FlushFileBuffers(serverPipe);
 	DisconnectNamedPipe(serverPipe);
 	CloseHandle(serverPipe);
+#else
+	close(serverPipe);
+    unlink(pipeName);
+#endif
 
 	return 0;
 }
-#else
-#include <GarrysMod/Lua/Interface.h>
-GMOD_MODULE_OPEN() { return 0; }
-GMOD_MODULE_CLOSE() { return 0; }
-#endif
