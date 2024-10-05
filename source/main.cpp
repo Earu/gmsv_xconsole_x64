@@ -47,18 +47,25 @@ public:
 		const Color* color = &pContext->m_Color;
 		MultiLibrary::ByteBuffer buffer;
 		buffer.Reserve(8192);
-		buffer <<
-			static_cast<int32_t>(chan->m_ID) <<
-			pContext->m_Severity <<
-			chan->m_Name <<
-			color->GetRawColor() <<
-			pMessage;
 
 #ifdef _WIN32
+		buffer <<
+			static_cast<int32_t>(chan->m_ID) <<
+			pContext->m_Severity << // int32
+			chan->m_Name <<
+			color->GetRawColor() << // on Windows this is r, g, b, a
+			pMessage;
+
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
 #else
-		buffer << "<EOL>";
+		buffer <<
+			static_cast<int32_t>(chan->m_ID) <<
+			pContext->m_Severity << // int32
+			color->GetRawColor() << // on UNIX this is a, r, g, b
+			chan->m_Name <<
+			pMessage << 
+			"<EOL>";
 
 		if (serverPipe == -1) {
 			serverConnected = false;
@@ -204,7 +211,7 @@ GMOD_MODULE_OPEN()
    	if (mkfifo(pipeName, 0666) == -1) {
         LUA->ThrowError( "failed to create named pipe (mkfifo)" );
     } else {
-		serverPipe = open(pipeName, O_RDWR);
+		serverPipe = open(pipeName, O_RDWR | O_NONBLOCK);
 		if (serverPipe == -1) {
 			LUA->ThrowError( "failed to create named pipe (open)" );
 		}
