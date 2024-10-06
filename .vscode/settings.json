@@ -10,5 +10,6 @@
 		"ratio": "cpp",
 		"tuple": "cpp",
 		"variant": "cpp"
-	}
+	},
+	"C_Cpp.errorSquiggles": "disabled"
 }
