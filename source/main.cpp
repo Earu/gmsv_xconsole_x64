@@ -1,9 +1,9 @@
 #ifdef _WIN32
 #include <Windows.h>
 #else
-#include <fcntl.h> 
-#include <unistd.h> 
-#include <sys/stat.h> 
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #endif
 
 #include <cstdint>
@@ -23,11 +23,17 @@
 #include <logging.h>
 #endif
 
+const int BUFFER_SIZE = 8192;
+
 #ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
-#else 
-const char* pipeName = "/tmp/garrysmod_console";
+#else
+const char* EOL_SEQUENCE = "<EOL>";
+const char* PIPE_NAME_OUT = "/tmp/garrysmod_console";
+const char* PIPE_NAME_IN = "/tmp/garrysmod_console_in";
+
 static int serverPipe = -1;
+static int serverPipeIn = -1;
 #endif
 
 static volatile bool serverShutdown = false;
@@ -35,7 +41,6 @@ static volatile bool serverConnected = false;
 static std::thread serverThread;
 
 #if ARCHITECTURE_IS_X86_64
-
 class XConsoleListener : public ILoggingListener
 {
 public:
@@ -46,7 +51,7 @@ public:
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
 		MultiLibrary::ByteBuffer buffer;
-		buffer.Reserve(8192);
+		buffer.Reserve(BUFFER_SIZE);
 
 #ifdef _WIN32
 		buffer <<
@@ -64,10 +69,11 @@ public:
 			pContext->m_Severity << // int32
 			color->GetRawColor() << // on UNIX this is a, r, g, b
 			chan->m_Name <<
-			pMessage << 
+			pMessage <<
 			"<EOL>";
 
-		if (serverPipe == -1) {
+		if (serverPipe == -1) 
+		{
 			serverConnected = false;
 			return;
 		}
@@ -109,39 +115,38 @@ static SpewRetval_t EngineSpewReceiver(SpewType_t type, const char* msg)
 }
 #endif
 
-static void ReadIncomingCommands() 
+static void RunCommand(std::string cmd) 
+{
+	// in case the command hasnt been passed with a newline
+	if (cmd[cmd.length() - 1] != '\n')
+		cmd.append("\n");
+
+	SourceSDK::FactoryLoader engine_loader("engine");
+	IVEngineServer* engine_server = engine_loader.GetInterface<IVEngineServer>(INTERFACEVERSION_VENGINESERVER);
+	engine_server->ServerCommand(cmd.c_str());
+}
+
+#ifdef _WIN32
+static void ReadIncomingCommands()
 {
 	MultiLibrary::ByteBuffer buffer;
 	buffer.Reserve(255);
 	buffer.Resize(255);
 
-#ifdef _WIN32
 	if (ReadFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == TRUE)
-#else
-	if (read(serverPipe, buffer.GetBuffer(), buffer.Size() - 1) != -1)
-#endif
 	{
 		if (buffer.Size() == 0) return;
 
 		std::string cmd;
 		buffer >> cmd;
-
-		// in case the command hasnt been passed with a newline
-		if (cmd[cmd.length() - 1] != '\n')
-			cmd.append("\n");
-
-		SourceSDK::FactoryLoader engine_loader("engine");
-		IVEngineServer* engine_server = engine_loader.GetInterface<IVEngineServer>(INTERFACEVERSION_VENGINESERVER);
-		engine_server->ServerCommand(cmd.c_str());
+		RunCommand(cmd);
 	}
 }
-
 
 static void ServerThread()
 {
 	while (!serverShutdown)
 	{
-#ifdef _WIN32
 		if (ConnectNamedPipe(serverPipe, nullptr) == FALSE)
 		{
 			DWORD error = GetLastError();
@@ -160,22 +165,81 @@ static void ServerThread()
 			serverConnected = true;
 			ReadIncomingCommands();
 		}
-#else
-		if (!serverConnected) {
-			if (mkfifo(pipeName, 0666) != -1) {
-				serverPipe = open(pipeName, O_RDWR);
-				if (serverPipe != -1) {
-					serverConnected = true;
-					//ReadIncomingCommands();
-				}
-			}
-		} else {
-			//ReadIncomingCommands();
-		}
-#endif
+
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
 }
+#else
+static void ServerThread()
+{
+  	std::vector<uint8_t> dataBuffer(BUFFER_SIZE);
+    std::vector<uint8_t> buffer(BUFFER_SIZE);	
+
+    int eolIndex = 0;
+	while (!serverShutdown && serverPipeIn != -1) 
+	{
+		int bytesRead = read(serverPipeIn, buffer.data(), buffer.size() - 1);
+		if (bytesRead > 0) 
+		{
+			for (int i = 0; i < bytesRead; i++) 
+			{
+				uint8_t currentByte = buffer[i];
+				dataBuffer.push_back(currentByte);
+
+				// Check if the current byte matches the next byte in the EOL sequence
+				if (currentByte == EOL_SEQUENCE[eolIndex]) 
+				{
+					eolIndex++;
+					if (eolIndex == std::strlen(EOL_SEQUENCE)) // Full EOL found
+					{  
+						// Remove <EOL> bytes
+						dataBuffer.erase(dataBuffer.end() - eolIndex, dataBuffer.end());
+
+						std::string cmd(dataBuffer.begin(), dataBuffer.end());
+						RunCommand(cmd);
+
+						// Clear the buffer for new data
+						dataBuffer.clear();
+						eolIndex = 0;  // Reset the EOL matching index
+					}
+				} 
+				else 
+				{
+					// Reset the EOL matching index if the byte doesn't match
+					eolIndex = 0;
+				}
+			}
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
+static int CreateNamedPipe(GarrysMod::Lua::ILuaBase *LUA, const char* pipeName) 
+{
+	struct stat sb;
+	if (stat(pipeName, &sb) == 0 && !(sb.st_mode & S_IFDIR)) 
+	{
+		unlink(pipeName);
+	}
+
+   	if (mkfifo(pipeName, 0666) == -1) 
+	{
+        LUA->ThrowError( "failed to create named pipe (mkfifo)" );
+		return -1;
+    } 
+	else 
+	{
+		int pipe = open(pipeName, O_RDWR | O_NONBLOCK);
+		if (pipe == -1) 
+		{
+			LUA->ThrowError( "failed to create named pipe (open)" );
+		}
+
+		return pipe;
+	}
+}
+#endif
 
 GMOD_MODULE_OPEN()
 {
@@ -194,8 +258,8 @@ GMOD_MODULE_OPEN()
 		PIPE_ACCESS_DUPLEX,
 		PIPE_TYPE_MESSAGE | PIPE_NOWAIT,
 		PIPE_UNLIMITED_INSTANCES,
-		8192,
-		8192,
+		BUFFER_SIZE,
+		BUFFER_SIZE,
 		NMPWAIT_USE_DEFAULT_WAIT,
 		&sa
 	);
@@ -203,19 +267,8 @@ GMOD_MODULE_OPEN()
 	if (serverPipe == INVALID_HANDLE_VALUE)
 		LUA->ThrowError( "failed to create named pipe" );
 #else
-	struct stat sb;
-	if (stat(pipeName, &sb) == 0 && !(sb.st_mode & S_IFDIR)) {
-		unlink(pipeName);
-	} 
-
-   	if (mkfifo(pipeName, 0666) == -1) {
-        LUA->ThrowError( "failed to create named pipe (mkfifo)" );
-    } else {
-		serverPipe = open(pipeName, O_RDWR | O_NONBLOCK);
-		if (serverPipe == -1) {
-			LUA->ThrowError( "failed to create named pipe (open)" );
-		}
-	}
+	serverPipe = CreateNamedPipe(LUA, PIPE_NAME_OUT);
+	serverPipeIn = CreateNamedPipe(LUA, PIPE_NAME_IN);
 #endif
 
 	serverThread = std::thread(ServerThread);
@@ -250,7 +303,10 @@ GMOD_MODULE_CLOSE()
 	CloseHandle(serverPipe);
 #else
 	close(serverPipe);
-    unlink(pipeName);
+    unlink(PIPE_NAME_OUT);
+
+	close(serverPipeIn);
+    unlink(PIPE_NAME_IN);
 #endif
 
 	return 0;

@@ -4,21 +4,28 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/../garrysmod_common/include",
-                "${workspaceFolder}/../garrysmod_common/detouring/include",
-                "${workspaceFolder}/../garrysmod_common/helpers/include",
-                "${workspaceFolder}/../garrysmod_common/helpers_extended/include",
-                "${workspaceFolder}/../garrysmod_common/sourcesdk-minimal/",
-                "${workspaceFolder}/../garrysmod_common/sourcesdk-minimal/public"
+                "${workspaceFolder}/../garrysmod_common/include/**",
+                "${workspaceFolder}/../garrysmod_common/detouring/include/**",
+                "${workspaceFolder}/../garrysmod_common/helpers/include/**",
+                "${workspaceFolder}/../garrysmod_common/helpers_extended/include/**",
+                "${workspaceFolder}/../garrysmod_common/goomod/include/**",
+                "${workspaceFolder}/../garrysmod_common/scanning/include/**",
+                "${workspaceFolder}/../garrysmod_common/sourcesdk-minimal/**",
+                "/usr/local/include/**"
             ],
-            "defines": [],
+            "defines": [
+                "__APPLE__",        // Make sure macOS is explicitly defined.
+                "__MACH__"
+            ],
             "macFrameworkPath": [
+                "/System/Library/Frameworks",
+                "/Library/Frameworks",
                 "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
-            "compilerPath": "/usr/bin/clang",
-            "cStandard": "c17",
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "macos-clang-x64"
+            "intelliSenseMode": "macos-gcc-x64"
         }
     ],
     "version": 4
