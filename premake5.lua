@@ -15,3 +15,6 @@ CreateWorkspace({name = "xconsole"})
 		IncludeSDKCommon()
 		IncludeSDKTier0()
 		IncludeSDKTier1()
+
+		filter("system:linux")
+			links({"pthread", "dl"})
