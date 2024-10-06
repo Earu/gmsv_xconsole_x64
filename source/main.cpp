@@ -72,14 +72,14 @@ public:
 			pMessage <<
 			"<EOL>";
 
-		if (serverPipe == -1) 
+		if (serverPipe == -1)
 		{
 			serverConnected = false;
 			return;
 		}
 
-    	if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
-        	serverConnected = false;
+		if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
+			serverConnected = false;
 #endif
 	}
 };
@@ -115,7 +115,7 @@ static SpewRetval_t EngineSpewReceiver(SpewType_t type, const char* msg)
 }
 #endif
 
-static void RunCommand(std::string cmd) 
+static void RunCommand(std::string cmd)
 {
 	// in case the command hasnt been passed with a newline
 	if (cmd[cmd.length() - 1] != '\n')
@@ -172,26 +172,26 @@ static void ServerThread()
 #else
 static void ServerThread()
 {
-  	std::vector<uint8_t> dataBuffer(BUFFER_SIZE);
-    std::vector<uint8_t> buffer(BUFFER_SIZE);	
+	std::vector<uint8_t> dataBuffer(BUFFER_SIZE);
+	std::vector<uint8_t> buffer(BUFFER_SIZE);
 
-    int eolIndex = 0;
-	while (!serverShutdown && serverPipeIn != -1) 
+	int eolIndex = 0;
+	while (!serverShutdown && serverPipeIn != -1)
 	{
 		int bytesRead = read(serverPipeIn, buffer.data(), buffer.size() - 1);
-		if (bytesRead > 0) 
+		if (bytesRead > 0)
 		{
-			for (int i = 0; i < bytesRead; i++) 
+			for (int i = 0; i < bytesRead; i++)
 			{
 				uint8_t currentByte = buffer[i];
 				dataBuffer.push_back(currentByte);
 
 				// Check if the current byte matches the next byte in the EOL sequence
-				if (currentByte == EOL_SEQUENCE[eolIndex]) 
+				if (currentByte == EOL_SEQUENCE[eolIndex])
 				{
 					eolIndex++;
 					if (eolIndex == std::strlen(EOL_SEQUENCE)) // Full EOL found
-					{  
+					{
 						// Remove <EOL> bytes
 						dataBuffer.erase(dataBuffer.end() - eolIndex, dataBuffer.end());
 
@@ -200,10 +200,10 @@ static void ServerThread()
 
 						// Clear the buffer for new data
 						dataBuffer.clear();
-						eolIndex = 0;  // Reset the EOL matching index
+						eolIndex = 0; // Reset the EOL matching index
 					}
-				} 
-				else 
+				}
+				else
 				{
 					// Reset the EOL matching index if the byte doesn't match
 					eolIndex = 0;
@@ -215,23 +215,23 @@ static void ServerThread()
 	}
 }
 
-static int CreateNamedPipe(GarrysMod::Lua::ILuaBase *LUA, const char* pipeName) 
+static int CreateNamedPipe(GarrysMod::Lua::ILuaBase *LUA, const char* pipeName)
 {
 	struct stat sb;
-	if (stat(pipeName, &sb) == 0 && !(sb.st_mode & S_IFDIR)) 
+	if (stat(pipeName, &sb) == 0 && !(sb.st_mode & S_IFDIR))
 	{
 		unlink(pipeName);
 	}
 
-   	if (mkfifo(pipeName, 0666) == -1) 
+   	if (mkfifo(pipeName, 0666) == -1)
 	{
-        LUA->ThrowError( "failed to create named pipe (mkfifo)" );
+		LUA->ThrowError( "failed to create named pipe (mkfifo)" );
 		return -1;
-    } 
-	else 
+	}
+	else
 	{
 		int pipe = open(pipeName, O_RDWR | O_NONBLOCK);
-		if (pipe == -1) 
+		if (pipe == -1)
 		{
 			LUA->ThrowError( "failed to create named pipe (open)" );
 		}
@@ -303,10 +303,10 @@ GMOD_MODULE_CLOSE()
 	CloseHandle(serverPipe);
 #else
 	close(serverPipe);
-    unlink(PIPE_NAME_OUT);
+	unlink(PIPE_NAME_OUT);
 
 	close(serverPipeIn);
-    unlink(PIPE_NAME_IN);
+	unlink(PIPE_NAME_IN);
 #endif
 
 	return 0;
