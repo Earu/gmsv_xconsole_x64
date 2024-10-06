@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #endif
 
+#include <cstring>
 #include <cstdint>
 #include <string>
 #include <thread>
