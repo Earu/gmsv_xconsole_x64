@@ -51,10 +51,11 @@ public:
 	{
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
+
+#ifdef _WIN32
 		MultiLibrary::ByteBuffer buffer;
 		buffer.Reserve(BUFFER_SIZE);
 
-#ifdef _WIN32
 		buffer <<
 			static_cast<int32_t>(chan->m_ID) <<
 			pContext->m_Severity << // int32
@@ -65,22 +66,47 @@ public:
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
 #else
-		buffer <<
-			static_cast<int32_t>(chan->m_ID) <<
-			pContext->m_Severity << // int32
-			color->GetRawColor() << // on UNIX this is a, r, g, b
-			chan->m_Name <<
-			pMessage <<
-			"<EOL>";
+
+		int32_t type = static_cast<int32_t>(chan->m_ID);
+		int32_t level = static_cast<int32_t>(pContext->m_Severity);
+		size_t chanNameLen = std::strlen(chan->m_Name) + 1; // +1 for null byte
+		int rawColor = color->GetRawColor();
+		size_t msgLen = std::strlen(pMessage) + 1;
+		size_t eolLen = std::strlen("<EOL>") + 1;
+
+		size_t totalSize = sizeof(type) + sizeof(level) + chanNameLen + 4 + msgLen + eolLen;
+		char* buffer = new char[totalSize];
+		char* ptr = buffer;
+
+		memcpy(ptr, &type, sizeof(type));
+		ptr += sizeof(type);
+		
+		memcpy(ptr, &level, sizeof(level));
+		ptr += sizeof(level);
+		
+		memcpy(ptr, chan->m_Name, chanNameLen);
+		ptr += chanNameLen;
+
+		memcpy(ptr, &rawColor, 4);
+		ptr += 4;
+
+		memcpy(ptr, pMessage, msgLen);
+		ptr += msgLen;
+
+		memcpy(ptr, "<EOL>", eolLen);
 
 		if (serverPipe == -1)
 		{
+			delete[] buffer;
 			serverConnected = false;
 			return;
 		}
 
-		if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
+		if (write(serverPipe, buffer, totalSize) == -1)
 			serverConnected = false;
+
+		delete[] buffer;
+
 #endif
 	}
 };
@@ -193,8 +219,8 @@ static void ServerThread()
 					eolIndex++;
 					if (eolIndex == std::strlen(EOL_SEQUENCE)) // Full EOL found
 					{
-						// Remove <EOL> bytes
-						dataBuffer.erase(dataBuffer.end() - eolIndex, dataBuffer.end());
+						// Remove <EOL> bytes and account for the extra null byte
+						dataBuffer.erase(dataBuffer.end() - (eolIndex + 1), dataBuffer.end());
 
 						std::string cmd(dataBuffer.begin(), dataBuffer.end());
 						RunCommand(cmd);
