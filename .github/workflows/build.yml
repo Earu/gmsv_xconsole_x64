@@ -146,3 +146,9 @@ jobs:
       run: |
         cd projects/windows/vs2022
         msbuild xconsole.sln /p:Configuration=ReleaseWithSymbols /p:Platform=x64
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: gmsv_xconsole_win64.dll
+        path: ${{ github.workspace }}\projects\windows\vs2022\x86_64\ReleaseWithSymbols\gmsv_xconsole_win64.dll
