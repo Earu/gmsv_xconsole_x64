@@ -64,7 +64,7 @@ jobs:
 
     - name: Generate makefiles with Premake
       run: |
-        sed -i '' 's/PROJECT_GENERATOR_VERSION = 3/PROJECT_GENERATOR_VERSION = 2/' ./premake.lua
+        sed -i '' 's/PROJECT_GENERATOR_VERSION = 3/PROJECT_GENERATOR_VERSION = 2/' ${{ github.workspace }}/premake.lua
         ./premake5 gmake
 
     - name: Build the project
