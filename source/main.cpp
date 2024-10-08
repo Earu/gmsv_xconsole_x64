@@ -29,7 +29,7 @@ const int BUFFER_SIZE = 8192;
 #ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 #else
-const char* EOL_SEQUENCE = "<EOL>";
+const char* EOL_SEQUENCE = "<EOL>\0";
 const char* PIPE_NAME_OUT = "/tmp/garrysmod_console";
 const char* PIPE_NAME_IN = "/tmp/garrysmod_console_in";
 
@@ -52,61 +52,36 @@ public:
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
 
-#ifdef _WIN32
 		MultiLibrary::ByteBuffer buffer;
 		buffer.Reserve(BUFFER_SIZE);
 
+#ifdef _WIN32
 		buffer <<
 			static_cast<int32_t>(chan->m_ID) <<
-			pContext->m_Severity << // int32
+			pContext->m_Severity <<
 			chan->m_Name <<
-			color->GetRawColor() << // on Windows this is r, g, b, a
+			color->GetRawColor() <<
 			pMessage;
 
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
 #else
-
-		int32_t type = static_cast<int32_t>(chan->m_ID);
-		int32_t level = static_cast<int32_t>(pContext->m_Severity);
-		size_t chanNameLen = std::strlen(chan->m_Name) + 1; // +1 for null byte
-		int rawColor = color->GetRawColor();
-		size_t msgLen = std::strlen(pMessage) + 1;
-		size_t eolLen = std::strlen("<EOL>") + 1;
-
-		size_t totalSize = sizeof(type) + sizeof(level) + chanNameLen + 4 + msgLen + eolLen;
-		char* buffer = new char[totalSize];
-		char* ptr = buffer;
-
-		memcpy(ptr, &type, sizeof(type));
-		ptr += sizeof(type);
-		
-		memcpy(ptr, &level, sizeof(level));
-		ptr += sizeof(level);
-		
-		memcpy(ptr, chan->m_Name, chanNameLen);
-		ptr += chanNameLen;
-
-		memcpy(ptr, &rawColor, 4);
-		ptr += 4;
-
-		memcpy(ptr, pMessage, msgLen);
-		ptr += msgLen;
-
-		memcpy(ptr, "<EOL>", eolLen);
+		buffer <<
+			static_cast<int32_t>(chan->m_ID) <<
+			pContext->m_Severity <<
+			chan->m_Name <<
+			color->GetRawColor() <<
+			pMessage <<
+			"<EOL>";
 
 		if (serverPipe == -1)
 		{
-			delete[] buffer;
 			serverConnected = false;
 			return;
 		}
 
-		if (write(serverPipe, buffer, totalSize) == -1)
+		if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
 			serverConnected = false;
-
-		delete[] buffer;
-
 #endif
 	}
 };
@@ -122,6 +97,8 @@ static SpewRetval_t EngineSpewReceiver(SpewType_t type, const char* msg)
 	const Color* color = GetSpewOutputColor();
 	MultiLibrary::ByteBuffer buffer;
 	buffer.Reserve(512);
+
+#ifdef _WIN32
 	buffer <<
 		static_cast<int32_t>(type) <<
 		GetSpewOutputLevel() <<
@@ -129,14 +106,26 @@ static SpewRetval_t EngineSpewReceiver(SpewType_t type, const char* msg)
 		color->GetRawColor() <<
 		msg;
 
-	if (WriteFile(
-		serverPipe,
-		buffer.GetBuffer(),
-		static_cast<DWORD>(buffer.Size()),
-		nullptr,
-		nullptr
-	) == FALSE)
+	if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 		serverConnected = false;
+#else
+	buffer <<
+		static_cast<int32_t>(type) <<
+		GetSpewOutputLevel() <<
+		GetSpewOutputGroup() <<
+		color->GetRawColor() <<
+		msg <<
+		"<EOL>";
+
+	if (serverPipe == -1)
+	{
+		serverConnected = false;
+		return spewFunction(type, msg);
+	}
+
+	if (write(serverPipe, buffer.GetBuffer(), buffer.Size()) == -1)
+		serverConnected = false;
+#endif
 
 	return spewFunction(type, msg);
 }
@@ -219,20 +208,17 @@ static void ServerThread()
 					eolIndex++;
 					if (eolIndex == std::strlen(EOL_SEQUENCE)) // Full EOL found
 					{
-						// Remove <EOL> bytes and account for the extra null byte
-						dataBuffer.erase(dataBuffer.end() - (eolIndex + 1), dataBuffer.end());
+						dataBuffer.erase(dataBuffer.end() - eolIndex, dataBuffer.end());
 
 						std::string cmd(dataBuffer.begin(), dataBuffer.end());
 						RunCommand(cmd);
 
-						// Clear the buffer for new data
 						dataBuffer.clear();
-						eolIndex = 0; // Reset the EOL matching index
+						eolIndex = 0;
 					}
 				}
 				else
 				{
-					// Reset the EOL matching index if the byte doesn't match
 					eolIndex = 0;
 				}
 			}
@@ -263,6 +249,7 @@ static int CreateNamedPipe(GarrysMod::Lua::ILuaBase *LUA, const char* pipeName)
 			LUA->ThrowError( "failed to create named pipe (open)" );
 		}
 
+		serverConnected = pipe != -1;
 		return pipe;
 	}
 }
