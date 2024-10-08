@@ -53,10 +53,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Install dependencies (Premake5)
+    - name: Install dependencies (Premake5 & GCC Multilib)
       run: |
         wget https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-linux.tar.gz
         tar -xvf premake-5.0.0-beta2-linux.tar.gz
+        sudo apt-get update
+        sudo apt-get install -y gcc-multilib g++-multilib
 
     - name: Clone garrysmod_common
       run: |
