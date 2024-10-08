@@ -1,4 +1,4 @@
-name: Linux Build
+name: Build
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: gmsv_xconsole_linux64.dll
-        path: ./gmsv_xconsole_linux64.dll
+        path: ./projects/linux/gmake/gmsv_xconsole_linux64.dll
   build_osx_64:
     runs-on: macos-latest
 
@@ -55,6 +55,7 @@ jobs:
       run: |
         wget https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-linux.tar.gz
         tar -xvf premake-5.0.0-beta2-linux.tar.gz
+        chmod a+x ./premake5
 
     - name: Clone garrysmod_common
       run: |
@@ -72,4 +73,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: gmsv_xconsole_osx64.dll
-        path: ./gmsv_xconsole_osx64.dll
+        path: ./projects/macosx/gmake/gmsv_xconsole_osx64.dll
