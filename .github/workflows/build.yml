@@ -124,7 +124,10 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
+      
+    - name: Install msbuild
+      uses: microsoft/setup-msbuild@v2
+      
     - name: Install dependencies (Premake5 on Windows)
       run: |
         # Download and install Premake for Windows
@@ -142,4 +145,4 @@ jobs:
     - name: Build the project with MSBuild
       run: |
         cd projects/windows/vs2022
-        MSBuild.exe xconsole.sln /p:Configuration=ReleaseWithSymbols /p:Platform=x64
+        msbuild xconsole.sln /p:Configuration=ReleaseWithSymbols /p:Platform=x64
