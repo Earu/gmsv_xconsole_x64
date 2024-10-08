@@ -1,0 +1,40 @@
+name: Linux Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      GARRYSMOD_COMMON: ${{ github.workspace }}/garrysmod_common
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies (Premake5)
+      run: |
+        wget https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-linux.tar.gz
+        tar -xvf premake-5.0.0-beta2-linux.tar.gz
+        sudo mv premake5 /usr/local/bin
+        premake5 --version  # Verify Premake installation
+
+    - name: Clone garrysmod_common
+      run: |
+        git clone --recursive --branch=x86-64-support-sourcesdk https://github.com/danielga/garrysmod_common
+
+    - name: Generate makefiles with Premake
+      run: |
+        premake5 gmake  # Generates the necessary makefiles
+
+    - name: Build the project
+      run: |
+        cd projects/linux/gmake  # Adjust based on the OS you're targeting (Linux or macOS)
+        make config=releasewithsymbols_x86_64
