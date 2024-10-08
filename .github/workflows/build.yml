@@ -64,8 +64,8 @@ jobs:
 
     - name: Generate makefiles with Premake
       run: |
-        awk '{ if ($1 == "PROJECT_GENERATOR_VERSION ") print "PROJECT_GENERATOR_VERSION  = 2"; else print $0 }' premake.lua > temp_file.lua
-        mv temp_file.lua premake.lua
+        awk '{ if ($1 == "PROJECT_GENERATOR_VERSION ") print "PROJECT_GENERATOR_VERSION  = 2"; else print $0 }' premake5.lua > temp_file.lua
+        mv temp_file.lua premake5.lua
         ./premake5 gmake
 
     - name: Build the project
