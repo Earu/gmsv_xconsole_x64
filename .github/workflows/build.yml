@@ -64,6 +64,7 @@ jobs:
 
     - name: Generate makefiles with Premake
       run: |
+        sed -i '' 's/PROJECT_GENERATOR_VERSION = 3/PROJECT_GENERATOR_VERSION = 2/' ./premake.lua
         ./premake5 gmake
 
     - name: Build the project
@@ -75,7 +76,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: gmsv_xconsole_linux.dll
-        path: ${{ github.workspace }}/projects/linux/gmake/x86_64/ReleaseWithSymbols/gmsv_xconsole_linux.dll
+        path: ${{ github.workspace }}/projects/linux/gmake/x86/Release/gmsv_xconsole_linux.dll
         
   build_osx_64:
     runs-on: macos-13
