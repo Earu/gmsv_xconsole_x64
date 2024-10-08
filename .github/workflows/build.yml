@@ -44,7 +44,7 @@ jobs:
         path: ${{ github.workspace }}/projects/linux/gmake/x86_64/ReleaseWithSymbols/gmsv_xconsole_linux64.dll
         
   build_osx_64:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     env:
       GARRYSMOD_COMMON: ${{ github.workspace }}/garrysmod_common
