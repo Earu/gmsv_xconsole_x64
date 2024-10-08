@@ -137,7 +137,7 @@ jobs:
 
     - name: Generate Visual Studio project files with Premake
       run: |
-        ${{ github.workspace }}/premake/premake5.exe vs2022
+        ${{ github.workspace }}/premake5/premake5.exe vs2022
 
     - name: Build the project with MSBuild
       run: |
