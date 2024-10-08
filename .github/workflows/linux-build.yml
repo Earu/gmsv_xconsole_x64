@@ -28,7 +28,7 @@ jobs:
 
     - name: Clone garrysmod_common
       run: |
-        git clone --recursive --branch=x86-64-support-sourcesdk https://github.com/danielga/garrysmod_common
+        git clone https://github.com/danielga/garrysmod_common --recursive --branch=x86-64-support-sourcesdk $GARRYSMOD_COMMON
 
     - name: Generate makefiles with Premake
       run: |
