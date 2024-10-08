@@ -152,3 +152,43 @@ jobs:
       with:
         name: gmsv_xconsole_win64.dll
         path: ${{ github.workspace }}\projects\windows\vs2022\x86_64\ReleaseWithSymbols\gmsv_xconsole_win64.dll
+
+  build_windows:
+    runs-on: windows-latest
+
+    env:
+      GARRYSMOD_COMMON: ${{ github.workspace }}/garrysmod_common
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Install msbuild
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Install dependencies (Premake5 on Windows)
+      run: |
+        # Download and install Premake for Windows
+        Invoke-WebRequest -Uri https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-windows.zip -OutFile premake5.zip
+        Expand-Archive premake5.zip -DestinationPath premake5
+
+    - name: Clone garrysmod_common
+      run: |
+        git clone --recursive https://github.com/danielga/garrysmod_common $GARRYSMOD_COMMON
+
+    - name: Generate Visual Studio project files with Premake
+      run: |
+        (Get-Content premake5.lua) -replace 'PROJECT_GENERATOR_VERSION = 3', 'PROJECT_GENERATOR_VERSION = 2' | Set-Content premake5.lua
+        ${{ github.workspace }}/premake5/premake5.exe vs2022
+
+    - name: Build the project with MSBuild
+      run: |
+        cd projects/windows/vs2022
+        msbuild xconsole.sln /p:Configuration=Release /p:Platform=x86
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: gmsv_xconsole_win32.dll
+        path: ${{ github.workspace }}\projects\windows\vs2022\x86\Release\gmsv_xconsole_win32.dll
+
