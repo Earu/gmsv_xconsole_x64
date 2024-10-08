@@ -23,8 +23,6 @@ jobs:
       run: |
         wget https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-linux.tar.gz
         tar -xvf premake-5.0.0-beta2-linux.tar.gz
-        sudo mv premake5 /usr/local/bin
-        premake5 --version  # Verify Premake installation
 
     - name: Clone garrysmod_common
       run: |
@@ -32,9 +30,9 @@ jobs:
 
     - name: Generate makefiles with Premake
       run: |
-        premake5 gmake  # Generates the necessary makefiles
+        ./premake5 gmake
 
     - name: Build the project
       run: |
-        cd projects/linux/gmake  # Adjust based on the OS you're targeting (Linux or macOS)
+        cd projects/linux/gmake
         make config=releasewithsymbols_x86_64
