@@ -24,8 +24,6 @@
 #include <logging.h>
 #endif
 
-const int BUFFER_SIZE = 8192;
-
 #ifdef _WIN32
 static HANDLE serverPipe = INVALID_HANDLE_VALUE;
 #else
@@ -51,11 +49,13 @@ public:
 	{
 		const CLoggingSystem::LoggingChannel_t* chan = LoggingSystem_GetChannel(pContext->m_ChannelID);
 		const Color* color = &pContext->m_Color;
-
+		int size = 12 + std::strlen(chan->m_Name) + std::strlen(pMessage);
+#ifndef _WIN32
+		size += 4; // extra 4 for <EOL>\0;
+#endif 
 		MultiLibrary::ByteBuffer buffer;
-		buffer.Reserve(BUFFER_SIZE);
+		buffer.Reserve(size);
 
-#ifdef _WIN32
 		buffer <<
 			static_cast<int32_t>(chan->m_ID) <<
 			pContext->m_Severity <<
@@ -63,16 +63,11 @@ public:
 			color->GetRawColor() <<
 			pMessage;
 
+#ifdef _WIN32
 		if (WriteFile(serverPipe, buffer.GetBuffer(), static_cast<DWORD>(buffer.Size()), nullptr, nullptr) == FALSE)
 			serverConnected = false;
 #else
-		buffer <<
-			static_cast<int32_t>(chan->m_ID) <<
-			pContext->m_Severity <<
-			chan->m_Name <<
-			color->GetRawColor() <<
-			pMessage <<
-			"<EOL>";
+		buffer << "<EOL>";
 
 		if (serverPipe == -1)
 		{
@@ -188,8 +183,8 @@ static void ServerThread()
 #else
 static void ServerThread()
 {
-	std::vector<uint8_t> dataBuffer(BUFFER_SIZE);
-	std::vector<uint8_t> buffer(BUFFER_SIZE);
+	std::vector<uint8_t> dataBuffer(255);
+	std::vector<uint8_t> buffer(255);
 
 	int eolIndex = 0;
 	while (!serverShutdown && serverPipeIn != -1)
@@ -272,8 +267,8 @@ GMOD_MODULE_OPEN()
 		PIPE_ACCESS_DUPLEX,
 		PIPE_TYPE_MESSAGE | PIPE_NOWAIT,
 		PIPE_UNLIMITED_INSTANCES,
-		BUFFER_SIZE,
-		BUFFER_SIZE,
+		16384,
+		16384,
 		NMPWAIT_USE_DEFAULT_WAIT,
 		&sa
 	);
